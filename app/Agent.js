@@ -195,15 +195,17 @@ export default function Agent() {
   const handleSend = () => { if (!input.trim() || loading) return; const msg = input.trim(); setInput(""); runAgent(msg); };
 
   const quickActions = [
-    { label: "🎓 Entry-Level SWE Jobs", msg: "Search for entry-level software engineer job postings on LinkedIn across the US in 2025." },
-    { label: "🚀 Mid-Level SWE Jobs", msg: "Search LinkedIn for mid-level software engineer positions (2-5 years experience) across the US in 2025." },
-    { label: "⭐ Senior Engineer Jobs", msg: "Find senior software engineer positions (5+ years experience) posted on LinkedIn across major US tech hubs in 2025." },
-    { label: "💼 Finance Roles (All Levels)", msg: "Search LinkedIn for finance analyst, investment banking, and financial analyst positions at all experience levels across major US financial hubs." },
+    { label: "🤖 AI / ML Jobs", msg: "Search LinkedIn for AI engineer, machine learning engineer, and ML researcher job postings across the US in 2025 at all experience levels." },
+    { label: "💻 Software Engineer Jobs", msg: "Search LinkedIn for software engineer job postings across the US in 2025 at all experience levels." },
+    { label: "📊 Data Science & Analytics", msg: "Search LinkedIn for data scientist, data analyst, and analytics engineer positions across the US in 2025." },
+    { label: "🎨 Product & Design Jobs", msg: "Search LinkedIn for product manager and UX/product designer positions across the US in 2025." },
+    { label: "💼 Finance & Banking Jobs", msg: "Search LinkedIn for finance analyst, investment banking, and financial analyst positions across major US financial hubs in 2025." },
+    { label: "☁️ DevOps & Cloud Jobs", msg: "Search LinkedIn for DevOps engineer, cloud engineer, and platform engineer positions across the US in 2025." },
   ];
 
   const profileFields = [
     { key: "name", placeholder: "Your name (e.g. Alex Chen)" },
-    { key: "field", placeholder: "Field / Major (e.g. CS, Finance)" },
+    { key: "field", placeholder: "Field / Role (e.g. AI, SWE, Design, Finance)" },
     { key: "skills", placeholder: "Top skills (e.g. Python, React)" },
     { key: "experience", placeholder: "Experience level (e.g. Entry-Level, 3 yrs)" },
   ];
