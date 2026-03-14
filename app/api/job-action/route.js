@@ -23,6 +23,28 @@ Tip: [tip]
 
 Q2: ...`,
 
+      "find-recruiter": `Suggest 3 specific types of people to reach out to at ${job.company} for the ${job.role} role in ${job.location}. ${profile}
+
+For each contact type, provide:
+- Their likely job title
+- A LinkedIn search tip to find them
+- A short personalized opening line tailored to this role
+
+Format exactly as:
+1. [Title]
+Find: [LinkedIn search tip, e.g. search "${job.company} Technical Recruiter"]
+Message: [one-sentence opening line]
+
+2. [Title]
+Find: [LinkedIn search tip]
+Message: [one-sentence opening line]
+
+3. [Title]
+Find: [LinkedIn search tip]
+Message: [one-sentence opening line]
+
+Keep each message under 20 words. Be specific to ${job.company} and the ${job.role} role.`,
+
       "tailor-resume": `Review this resume for the ${job.role} role at ${job.company} in ${job.location}. ${profile}
 
 Resume:

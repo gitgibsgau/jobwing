@@ -72,13 +72,20 @@ const timeAgo = (ts) => {
 
 // ─── ActionPanel ──────────────────────────────────────────────────────────────
 
-const ActionPanel = ({ action, loading, content }) => {
+const ActionPanel = ({ action, job, loading, content, onRegenerate }) => {
   const [copied, setCopied] = useState(false);
   const labels = {
-    "cold-dm":       "✉️ Cold DM",
-    "cover-letter":  "📄 Cover Letter",
-    "interview-prep":"🎤 Interview Prep",
+    "cold-dm":        "✉️ Cold DM",
+    "cover-letter":   "📄 Cover Letter",
+    "interview-prep": "🎤 Interview Prep",
+    "find-recruiter": "👤 Find Recruiter",
   };
+
+  const isCached = (() => {
+    if (!job || !action) return false;
+    try { return !!JSON.parse(localStorage.getItem(`jw_action_${job.company}||${job.role}||${action}`) || "null")?.content; } catch { return false; }
+  })();
+
   return (
     <div style={{
       marginTop: "12px",
@@ -88,16 +95,34 @@ const ActionPanel = ({ action, loading, content }) => {
       borderRadius: "10px",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, color: C.mintDark, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-          {labels[action]}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "11px", fontWeight: 700, color: C.mintDark, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            {labels[action]}
+          </span>
+          {isCached && !loading && (
+            <span style={{ fontSize: "10px", color: C.text4, background: C.borderGray, borderRadius: "8px", padding: "1px 7px", fontFamily: "'DM Mono', monospace" }}>
+              cached
+            </span>
+          )}
+        </div>
         {!loading && content && (
-          <button
-            onClick={() => { navigator.clipboard.writeText(content); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-            style={{ background: "none", border: "none", color: copied ? C.mint : C.text3, fontSize: "11px", cursor: "pointer", fontFamily: "Inter, sans-serif" }}
-          >
-            {copied ? "✓ Copied" : "Copy"}
-          </button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {isCached && (
+              <button
+                onClick={onRegenerate}
+                title="Clear cache and regenerate"
+                style={{ background: "none", border: "none", color: C.text4, fontSize: "11px", cursor: "pointer", fontFamily: "Inter, sans-serif" }}
+              >
+                ↻ Regenerate
+              </button>
+            )}
+            <button
+              onClick={() => { navigator.clipboard.writeText(content); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+              style={{ background: "none", border: "none", color: copied ? C.mint : C.text3, fontSize: "11px", cursor: "pointer", fontFamily: "Inter, sans-serif" }}
+            >
+              {copied ? "✓ Copied" : "Copy"}
+            </button>
+          </div>
         )}
       </div>
       {loading ? (
@@ -125,6 +150,15 @@ const JobCard = ({ job, index = 0, isSaved, onToggleSave, pipelineStage, onAddTo
   const runAction = async (action) => {
     if (activeAction === action && !actionLoading) { setActiveAction(null); return; }
     setActiveAction(action);
+
+    // Check localStorage cache first — never re-call API for same job+action
+    const ck = `jw_action_${job.company}||${job.role}||${action}`;
+    try {
+      const hit = JSON.parse(localStorage.getItem(ck) || "null");
+      if (hit?.content) { setActionContent(hit.content); return; }
+    } catch {}
+
+
     setActionLoading(true);
     setActionContent("");
     try {
@@ -134,11 +168,21 @@ const JobCard = ({ job, index = 0, isSaved, onToggleSave, pipelineStage, onAddTo
         body: JSON.stringify({ job, action, userProfile }),
       });
       const data = await res.json();
-      setActionContent(data.content || "");
+      const content = data.content || "";
+      setActionContent(content);
+      // Persist to localStorage so this action is never regenerated
+      if (content) try { localStorage.setItem(ck, JSON.stringify({ content, ts: Date.now() })); } catch {}
     } catch {
       setActionContent("Error generating content. Please try again.");
     }
     setActionLoading(false);
+  };
+
+  const regenerateAction = (action) => {
+    try { localStorage.removeItem(`jw_action_${job.company}||${job.role}||${action}`); } catch {}
+    setActiveAction(null);
+    setActionContent("");
+    setTimeout(() => runAction(action), 0);
   };
 
   const score = job.fitScore;
@@ -237,9 +281,10 @@ const JobCard = ({ job, index = 0, isSaved, onToggleSave, pipelineStage, onAddTo
       {/* Action bar */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", borderTop: `1px solid ${C.borderGray}`, paddingTop: "10px" }}>
         {[
-          { id: "cold-dm",       label: "✉️ Cold DM" },
-          { id: "cover-letter",  label: "📄 Cover Letter" },
-          { id: "interview-prep",label: "🎤 Interview Prep" },
+          { id: "cold-dm",        label: "✉️ Cold DM" },
+          { id: "cover-letter",   label: "📄 Cover Letter" },
+          { id: "interview-prep", label: "🎤 Interview Prep" },
+          { id: "find-recruiter", label: "👤 Recruiter" },
         ].map((a) => (
           <button
             key={a.id}
@@ -281,7 +326,7 @@ const JobCard = ({ job, index = 0, isSaved, onToggleSave, pipelineStage, onAddTo
       </div>
 
       {activeAction && (
-        <ActionPanel action={activeAction} loading={actionLoading} content={actionContent} />
+        <ActionPanel action={activeAction} job={job} loading={actionLoading} content={actionContent} onRegenerate={() => regenerateAction(activeAction)} />
       )}
     </div>
   );
@@ -593,17 +638,57 @@ export default function Agent() {
   useEffect(() => {
     try { setSavedJobs(JSON.parse(localStorage.getItem("savedJobs") || "[]")); } catch {}
     try { setPipeline(JSON.parse(localStorage.getItem("pipeline") || "{}")); } catch {}
-    try { setSearchHistory(JSON.parse(sessionStorage.getItem("searchHistory") || "[]")); } catch {}
+    try { setSearchHistory(JSON.parse(localStorage.getItem("searchHistory") || "[]")); } catch {}
     try {
       const p = JSON.parse(localStorage.getItem("userProfile") || "null");
       if (p) setUserProfile(p);
+    } catch {}
+    // Load search cache from localStorage, drop entries older than 24h
+    try {
+      const raw = JSON.parse(localStorage.getItem("searchCache") || "{}");
+      const ttl = 24 * 60 * 60 * 1000;
+      const fresh = Object.fromEntries(
+        Object.entries(raw).filter(([, v]) => Date.now() - v.timestamp < ttl)
+      );
+      if (Object.keys(fresh).length > 0) setSearchCache(fresh);
+    } catch {}
+    try {
+      const v = localStorage.getItem("view");
+      if (v) setView(v);
+    } catch {}
+    try {
+      const sf = JSON.parse(localStorage.getItem("searchForm") || "null");
+      if (sf) setSearchForm(sf);
+    } catch {}
+    try {
+      const ck = localStorage.getItem("currentCacheKey");
+      if (ck) setCurrentCacheKey(ck);
+    } catch {}
+    try {
+      const cf = localStorage.getItem("cityFilter");
+      if (cf) setCityFilter(cf);
+    } catch {}
+    try {
+      const post = localStorage.getItem("suggestedPost");
+      if (post) setSuggestedPost(post);
+    } catch {}
+    try {
+      const dr = localStorage.getItem("dashboardRole");
+      if (dr) setDashboardRole(dr);
     } catch {}
   }, []);
 
   useEffect(() => { localStorage.setItem("savedJobs", JSON.stringify(savedJobs)); }, [savedJobs]);
   useEffect(() => { localStorage.setItem("pipeline", JSON.stringify(pipeline)); }, [pipeline]);
-  useEffect(() => { sessionStorage.setItem("searchHistory", JSON.stringify(searchHistory)); }, [searchHistory]);
+  useEffect(() => { localStorage.setItem("searchHistory", JSON.stringify(searchHistory)); }, [searchHistory]);
   useEffect(() => { localStorage.setItem("userProfile", JSON.stringify(userProfile)); }, [userProfile]);
+  useEffect(() => { try { localStorage.setItem("searchCache", JSON.stringify(searchCache)); } catch {} }, [searchCache]);
+  useEffect(() => { localStorage.setItem("view", view); }, [view]);
+  useEffect(() => { localStorage.setItem("searchForm", JSON.stringify(searchForm)); }, [searchForm]);
+  useEffect(() => { if (currentCacheKey) localStorage.setItem("currentCacheKey", currentCacheKey); }, [currentCacheKey]);
+  useEffect(() => { localStorage.setItem("cityFilter", cityFilter); }, [cityFilter]);
+  useEffect(() => { localStorage.setItem("suggestedPost", suggestedPost); }, [suggestedPost]);
+  useEffect(() => { localStorage.setItem("dashboardRole", dashboardRole); }, [dashboardRole]);
 
   // ── Search ──
   const runSearch = async (params, forceRefresh = false) => {
@@ -754,10 +839,10 @@ export default function Agent() {
               </div>
               <div>
                 <div style={{ fontWeight: 800, fontSize: "15px", color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
-                  Launchpad
+                  JobWing
                 </div>
                 <div style={{ fontSize: "10px", color: C.text4, letterSpacing: "0.02em", marginTop: "1px" }}>
-                  AI Job Intelligence
+                  Your AI job wingman
                 </div>
               </div>
             </div>
@@ -865,11 +950,46 @@ export default function Agent() {
           {/* ── DASHBOARD ── */}
           {view === "dashboard" && (
             <div style={{ animation: "fadeSlideIn 0.4s ease both" }}>
-              <div style={{ marginBottom: "28px" }}>
+              <div style={{ marginBottom: "24px" }}>
                 <div style={{ fontWeight: 800, fontSize: "26px", color: C.text, marginBottom: "6px" }}>
-                  {userProfile.name ? `Hi ${userProfile.name}! 👋` : "Welcome to Launchpad 🚀"}
+                  {userProfile.name ? `Hi ${userProfile.name}! 👋` : "Welcome to JobWing 🚀"}
                 </div>
-                <div style={{ fontSize: "14px", color: C.text3 }}>Ready to find your next role?</div>
+                <div style={{ fontSize: "14px", color: C.text3 }}>
+                  Not just a job board — cold DMs, cover letters, interview prep, pipeline tracking, and recruiter suggestions, all in one place.
+                </div>
+              </div>
+
+              {/* Feature highlights */}
+              <div style={{ display: "flex", gap: "10px", marginBottom: "26px", overflowX: "auto", paddingBottom: "4px" }}>
+                {[
+                  { icon: "✉️", label: "Cold DM", desc: "Message recruiters in seconds", color: C.mint, bg: C.mintLight, border: `${C.mint}40` },
+                  { icon: "📄", label: "Cover Letter", desc: "Tailored to every job", color: C.blue, bg: C.blueLight, border: `${C.blue}40` },
+                  { icon: "🎤", label: "Interview Prep", desc: "Role-specific Q&A", color: C.purple, bg: C.purpleLight, border: `${C.purple}40` },
+                  { icon: "📋", label: "Kanban Board", desc: "Track every application", color: C.amber, bg: C.amberLight, border: `${C.amber}40`, onClick: () => setView("pipeline") },
+                  { icon: "❤️", label: "Save Jobs", desc: "Favorite & revisit anytime", color: C.pink, bg: C.pinkLight, border: `${C.pink}40`, onClick: () => setView("saved") },
+                  { icon: "👤", label: "Find Recruiters", desc: "Know exactly who to reach", color: "#6366f1", bg: "#eef2ff", border: "#6366f140" },
+                ].map((f) => (
+                  <div
+                    key={f.label}
+                    onClick={f.onClick}
+                    style={{
+                      flexShrink: 0,
+                      background: f.bg,
+                      border: `1px solid ${f.border}`,
+                      borderRadius: "12px",
+                      padding: "12px 14px",
+                      minWidth: "132px",
+                      cursor: f.onClick ? "pointer" : "default",
+                      transition: "transform 0.15s, box-shadow 0.15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+                  >
+                    <div style={{ fontSize: "20px", marginBottom: "6px" }}>{f.icon}</div>
+                    <div style={{ fontWeight: 700, fontSize: "12px", color: f.color, lineHeight: 1.2 }}>{f.label}</div>
+                    <div style={{ fontSize: "11px", color: C.text3, marginTop: "3px", lineHeight: 1.35 }}>{f.desc}</div>
+                  </div>
+                ))}
               </div>
 
               {/* Quick search */}

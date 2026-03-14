@@ -1,7 +1,7 @@
 export const metadata = {
-  title: "Launchpad — AI Job Intelligence",
+  title: "JobWing — Your AI Wingman for Landing the Job",
   description:
-    "Find your next role with AI-powered fit scores and personalized insights",
+    "Cold DMs, cover letters, interview prep, pipeline tracking, and recruiter suggestions — all in one place.",
   viewport: "width=device-width, initial-scale=1",
 };
 
