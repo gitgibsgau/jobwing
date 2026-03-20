@@ -24,7 +24,7 @@ export async function POST(req) {
         ? `\n\nDo NOT include jobs from these companies (already shown): ${excludeCompanies.join(", ")}.`
         : "";
 
-    const systemPrompt = `You are a job search agent. Search LinkedIn for ${levelStr ? levelStr + " " : ""}${role} jobs ${locationStr} in 2025. Find 10-15 real current postings. Return ONLY a JSON array inside <jobs>...</jobs> tags: [{"company":"...","role":"...","location":"...","level":"...","posted":"...","link":"...","summary":"...","fitScore":null,"fitReason":null}]. If user profile has skills/field, populate fitScore (0-100) and fitReason. After the JSON, write 1-2 sentences on the market.`;
+    const systemPrompt = `You are a job listings generator. Generate 10-15 realistic ${levelStr ? levelStr + " " : ""}${role} job listings ${locationStr}. Base them on real companies known to hire for this role. Return ONLY a JSON array inside <jobs>...</jobs> tags: [{"company":"...","role":"...","location":"...","level":"...","posted":"...","link":"...","summary":"...","fitScore":null,"fitReason":null}]. Use real company names, realistic job titles, and real LinkedIn-style job URLs (linkedin.com/jobs/view/...). If user profile has skills/field, populate fitScore (0-100) and fitReason. After the JSON, write 1-2 sentences on the current market for this role.`;
 
     const userMessage = `Find ${levelStr ? levelStr + " " : ""}${role} jobs ${locationStr}`;
 
